@@ -37,7 +37,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Calendar color={color} size={24} />,
         }}
       />
-      {/* THÊM TAB CHAT VÀO ĐÂY */}
       <Tabs.Screen
         name="chat"
         options={{

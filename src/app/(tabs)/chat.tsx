@@ -30,7 +30,7 @@ export default function ChatTab() {
     loadUser();
   }, []);
 
-  // 2. Lắng nghe tin nhắn từ Firebase
+  // Lắng nghe từ Firebase
   useEffect(() => {
     if (!currentUser) return;
 
@@ -56,7 +56,7 @@ export default function ChatTab() {
     return () => unsub();
   }, [currentUser]);
 
-  // 3. Hàm Gửi tin nhắn
+  // Hàm Gửi tin nhắn
   const handleSend = async () => {
     if (!inputText.trim() || !currentUser) return;
 
