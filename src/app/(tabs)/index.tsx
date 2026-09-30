@@ -12,7 +12,7 @@ export default function HomeTab() {
   const [carData, setCarData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Mốc thời gian thực hiện tại (Unix timestamp tính bằng giây)
+  // Mốc thời gian thực tế hiện tại (Unix Timestamp tính theo giây)
   const [nowTimestamp, setNowTimestamp] = useState<number>(Math.floor(Date.now() / 1000));
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function HomeTab() {
     loadUser();
   }, []);
 
-  // Timer chạy ngầm định kỳ 3 giây một lần để quét trạng thái Heartbeat
+  // Timer quét định kỳ 3 giây/lần để so sánh độ trôi của Heartbeat
   useEffect(() => {
     const heartbeatInterval = setInterval(() => {
       setNowTimestamp(Math.floor(Date.now() / 1000));
@@ -130,19 +130,33 @@ export default function HomeTab() {
     );
   }
 
-  // --- CÁC ĐIỀU KIỆN ĐÁNH GIÁ TRẠNG THÁI ---
-  const isBleConnected = carData?.ble_connected === true;
-  const currentDistance = carData?.uwb_distance || '> 50m';
-  const connectionColor = isBleConnected ? '#10b981' : '#ef4444'; 
-  const connectionBg = isBleConnected ? '#10b98120' : '#ef444420';
-  const isOverdue = activeBooking?.status === 'OVERDUE';
-
-  // Kiểm tra thời gian Heartbeat cuối cùng so với hiện tại (ngưỡng 30s)
-  const HEARTBEAT_TIMEOUT_SECONDS = 30;
+  // --- LOGIC PHÂN TÍCH TRẠNG THÁI MẠNG & MÀU SẮC ---
+  const HEARTBEAT_TIMEOUT_SECONDS = 15;
   const isCarOnline = Boolean(
     carData?.last_heartbeat && 
     (nowTimestamp - Number(carData.last_heartbeat)) <= HEARTBEAT_TIMEOUT_SECONDS
   );
+
+  const isBleConnected = carData?.ble_connected === true;
+  const isOverdue = activeBooking?.status === 'OVERDUE';
+  const currentDistance = carData?.uwb_distance || '> 50m';
+
+  let connectionColor = '#ef4444'; // Mặc định lỗi / mất kết nối BLE
+  let connectionBg = '#ef444420';
+
+  if (!isCarOnline) {
+    connectionColor = '#f59e0b';
+    connectionBg = 'rgba(245, 158, 11, 0.15)';
+  } else if (isBleConnected) {
+    connectionColor = '#10b981';
+    connectionBg = 'rgba(16, 185, 129, 0.15)';
+  }
+
+  // Màu badge trạng thái cửa xe
+  let doorBadgeBg = carData?.door_status === 'Unlocked' ? '#10b981' : '#ef4444';
+  if (!isCarOnline) {
+    doorBadgeBg = '#d97706'; // Màu vàng
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -156,8 +170,8 @@ export default function HomeTab() {
               <Text style={styles.carModel}>{carData?.car_model || 'Xe của bạn'}</Text>
               
               <View style={[styles.networkBadge, isCarOnline ? styles.networkOnline : styles.networkOffline]}>
-                {isCarOnline ? <Wifi size={12} color="#10b981" /> : <WifiOff size={12} color="#94a3b8" />}
-                <Text style={[styles.networkText, isCarOnline ? { color: '#10b981' } : { color: '#94a3b8' }]}>
+                {isCarOnline ? <Wifi size={12} color="#10b981" /> : <WifiOff size={12} color="#f59e0b" />}
+                <Text style={[styles.networkText, isCarOnline ? { color: '#10b981' } : { color: '#f59e0b' }]}>
                   {isCarOnline ? 'Trực tuyến' : 'Ngoại tuyến'}
                 </Text>
               </View>
@@ -184,15 +198,18 @@ export default function HomeTab() {
             )}
           </View>
 
-          {/* Hình ảnh xe */}
+          {/* Hình ảnh xe & Trạng thái cửa */}
           <View style={styles.carImageContainer}>
             <CarIcon color="#f1f5f9" size={120} strokeWidth={1.5} />
-            <View style={[styles.statusBadge, { backgroundColor: carData?.door_status === 'Unlocked' ? '#10b981' : '#ef4444' }]}>
-              <Text style={styles.statusText}>{carData?.door_status === 'Unlocked' ? 'ĐANG MỞ CỬA' : 'ĐANG KHÓA'}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: doorBadgeBg }]}>
+              <Text style={styles.statusText}>
+                {carData?.door_status === 'Unlocked' ? 'ĐANG MỞ CỬA' : 'ĐANG KHÓA'}
+                {!isCarOnline && ' (NGOẠI TUYẾN)'}
+              </Text>
             </View>
           </View>
 
-          {/* Control Panel 4 nút */}
+          {/* Control Panel & Radar */}
           <View style={styles.controlPanel}>
             <View style={styles.radarCard}>
               <Text style={styles.radarTitle}>Trạng thái định vị khoảng cách</Text>
@@ -201,10 +218,16 @@ export default function HomeTab() {
                   <User color={connectionColor} size={20} />
                 </View>
                 <View style={styles.lineWrapper}>
-                  <View style={[styles.dashedLine, { borderColor: connectionColor, opacity: isBleConnected ? 0.8 : 0.4 }]} />
+                  <View style={[styles.dashedLine, { borderColor: connectionColor, opacity: 0.8 }]} />
                   <View style={[styles.distancePill, { backgroundColor: connectionColor }]}>
-                    {isBleConnected && <View style={styles.iconWrapperSmall}><Bluetooth color="#ffffff" size={13} /></View>}
-                    <Text style={styles.distancePillText}>{isBleConnected ? currentDistance : 'Mất kết nối'}</Text>
+                    {isBleConnected && (
+                      <View style={styles.iconWrapperSmall}>
+                        <Bluetooth color="#ffffff" size={13} />
+                      </View>
+                    )}
+                    <Text style={styles.distancePillText}>
+                      {!isCarOnline ? `${currentDistance} ` : (isBleConnected ? currentDistance : 'Mất kết nối')}
+                    </Text>
                   </View>
                 </View>
                 <View style={[styles.nodeCircle, { borderColor: connectionColor, backgroundColor: connectionBg }]}>
@@ -263,7 +286,7 @@ const styles = StyleSheet.create({
   
   networkBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, gap: 4 },
   networkOnline: { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.2)' },
-  networkOffline: { backgroundColor: 'rgba(148, 163, 184, 0.1)', borderColor: 'rgba(148, 163, 184, 0.2)' },
+  networkOffline: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.35)' },
   networkText: { fontSize: 11, fontWeight: 'bold' },
 
   licensePlateBox: { borderWidth: 1, borderColor: '#334155', paddingHorizontal: 16, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(15, 23, 42, 0.4)' },
