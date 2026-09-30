@@ -12,6 +12,9 @@ export default function HomeTab() {
   const [carData, setCarData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Mốc thời gian thực hiện tại (Unix timestamp tính bằng giây)
+  const [nowTimestamp, setNowTimestamp] = useState<number>(Math.floor(Date.now() / 1000));
+
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -26,6 +29,15 @@ export default function HomeTab() {
       }
     };
     loadUser();
+  }, []);
+
+  // Timer chạy ngầm định kỳ 3 giây một lần để quét trạng thái Heartbeat
+  useEffect(() => {
+    const heartbeatInterval = setInterval(() => {
+      setNowTimestamp(Math.floor(Date.now() / 1000));
+    }, 3000);
+
+    return () => clearInterval(heartbeatInterval);
   }, []);
 
   useEffect(() => {
@@ -118,12 +130,19 @@ export default function HomeTab() {
     );
   }
 
+  // --- CÁC ĐIỀU KIỆN ĐÁNH GIÁ TRẠNG THÁI ---
   const isBleConnected = carData?.ble_connected === true;
   const currentDistance = carData?.uwb_distance || '> 50m';
   const connectionColor = isBleConnected ? '#10b981' : '#ef4444'; 
   const connectionBg = isBleConnected ? '#10b98120' : '#ef444420';
   const isOverdue = activeBooking?.status === 'OVERDUE';
-  const isCarOnline = carData?.network_status === 'ONLINE';
+
+  // Kiểm tra thời gian Heartbeat cuối cùng so với hiện tại (ngưỡng 30s)
+  const HEARTBEAT_TIMEOUT_SECONDS = 30;
+  const isCarOnline = Boolean(
+    carData?.last_heartbeat && 
+    (nowTimestamp - Number(carData.last_heartbeat)) <= HEARTBEAT_TIMEOUT_SECONDS
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -165,7 +184,7 @@ export default function HomeTab() {
             )}
           </View>
 
-          {/* Hình ảnh xe dùng flex: 1 để tự động đẩy các UI xuống */}
+          {/* Hình ảnh xe */}
           <View style={styles.carImageContainer}>
             <CarIcon color="#f1f5f9" size={120} strokeWidth={1.5} />
             <View style={[styles.statusBadge, { backgroundColor: carData?.door_status === 'Unlocked' ? '#10b981' : '#ef4444' }]}>
@@ -256,7 +275,6 @@ const styles = StyleSheet.create({
   rentalTimeLabel: { color: '#94a3b8', fontSize: 12 },
   rentalTimeValue: { color: '#38bdf8', fontSize: 12, fontWeight: 'bold', fontFamily: 'monospace' },
 
-  // Chuyển margin cứng thành flex để co giãn thông minh
   carImageContainer: { alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 140, marginVertical: 16 },
   statusBadge: { marginTop: -4, paddingHorizontal: 18, paddingVertical: 5, borderRadius: 20 },
   statusText: { color: '#ffffff', fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 },
